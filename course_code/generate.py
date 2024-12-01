@@ -90,16 +90,18 @@ if __name__ == "__main__":
                         help="The split of the dataset to use. This is only relevant for the full data: "
                              "0 for public validation set, 1 for public test set")
 
-    parser.add_argument("--model_name", type=str, default="vanilla_baseline",
+    parser.add_argument("--model_name", type=str, default="rag_ours",
                         choices=["vanilla_baseline",
-                                 "rag_baseline"
+                                 "rag_baseline",
+                                 "rag_ours"
                                  # add your model here
                                  ],
                         )
 
-    parser.add_argument("--llm_name", type=str, default="meta-llama/Llama-3.2-3B-Instruct",
+    parser.add_argument("--llm_name", type=str, default="/home/whx/MolMoE/checkpoints/Llama-3.2-3B-Instruct",
                         choices=["meta-llama/Llama-3.2-3B-Instruct",
                                  "google/gemma-2-2b-it",
+                                 "/home/whx/MolMoE/checkpoints/Llama-3.2-3B-Instruct"
                                  # can add more llm models here
                                  ])
     parser.add_argument("--is_server", action="store_true", default=False,
@@ -118,7 +120,7 @@ if __name__ == "__main__":
         if split == -1:
             raise ValueError("Please provide a valid split value for the full data: "
                              "0 for public validation set, 1 for public test set.")
-    dataset_path = os.path.join("..", dataset_path)
+    dataset_path = os.path.join("/home/whx/cs245-project-crag/", dataset_path)
 
     llm_name = args.llm_name
     _llm_name = llm_name.split("/")[-1]
@@ -130,13 +132,14 @@ if __name__ == "__main__":
     elif model_name == "rag_baseline":
         from rag_baseline import RAGModel
         model = RAGModel(llm_name=llm_name, is_server=args.is_server, vllm_server=args.vllm_server)
-    # elif model_name == "your_model":
-    #     add your model here
+    elif model_name == "rag_ours":
+        from rag_ours import RAGModel
+        model = RAGModel(llm_name=llm_name, is_server=args.is_server, vllm_server=args.vllm_server)
     else:
         raise ValueError("Model name not recognized.")
 
     # make output directory
-    output_directory = os.path.join("..", "output", dataset, model_name, _llm_name)
+    output_directory = os.path.join("/home/whx/cs245-project-crag", "output", dataset, model_name, _llm_name)
     os.makedirs(output_directory, exist_ok=True)
 
     # Generate predictions

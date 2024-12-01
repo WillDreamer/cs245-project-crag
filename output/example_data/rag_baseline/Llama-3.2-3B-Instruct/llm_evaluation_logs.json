@@ -1,0 +1,14 @@
+[
+    {
+        "query": "what is the other language between heaven and hell came out in originally?",
+        "ground_truth": "en",
+        "prediction": "Gehennim (Hebrew)",
+        "response": "False"
+    },
+    {
+        "query": "which companies have the highest level of dividend yield?",
+        "ground_truth": "some companies with a high level of dividend yield are hess midstream lp, xerox, and at&t with dividend yields of over 5% each.",
+        "prediction": "The highest-yielding S&P 500 dividend stocks all deliver yields north of 6%.",
+        "response": "Accuracy: True"
+    }
+]

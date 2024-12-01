@@ -1,0 +1,14 @@
+[
+    {
+        "query": "which companies have the highest level of dividend yield?",
+        "ground_truth": "some companies with a high level of dividend yield are hess midstream lp, xerox, and at&t with dividend yields of over 5% each.",
+        "prediction": "Pfizer Inc.",
+        "response": "False"
+    },
+    {
+        "query": "is dreamworks animation owned by time warner or universal pictures?",
+        "ground_truth": "universal pictures",
+        "prediction": "Universal Pictures.",
+        "response": "Accuracy: True"
+    }
+]

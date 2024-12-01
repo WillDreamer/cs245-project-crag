@@ -13,6 +13,8 @@ from sentence_transformers import SentenceTransformer
 from openai import OpenAI
 
 from tqdm import tqdm
+from langchain.text_splitter import CharacterTextSplitter,RecursiveCharacterTextSplitter
+from langchain.schema import Document
 
 #### CONFIG PARAMETERS ---
 
@@ -60,18 +62,20 @@ class ChunkExtractor:
         if not text:
             # Return a list with empty string when no text is extracted
             return interaction_id, [""]
+        text_splitter = CharacterTextSplitter(chunk_size=500, chunk_overlap=50)
+        chunks = text_splitter.split_text(text)
 
-        # Extract offsets of sentences from the text
-        _, offsets = text_to_sentences_and_offsets(text)
+        # # Extract offsets of sentences from the text
+        # _, offsets = text_to_sentences_and_offsets(text)
 
-        # Initialize a list to store sentences
-        chunks = []
+        # # Initialize a list to store sentences
+        # chunks = []
 
-        # Iterate through the list of offsets and extract sentences
-        for start, end in offsets:
-            # Extract the sentence and limit its length
-            sentence = text[start:end][:MAX_CONTEXT_SENTENCE_LENGTH]
-            chunks.append(sentence)
+        # # Iterate through the list of offsets and extract sentences
+        # for start, end in offsets:
+        #     # Extract the sentence and limit its length
+        #     sentence = text[start:end][:MAX_CONTEXT_SENTENCE_LENGTH]
+        #     chunks.append(sentence)
 
         return interaction_id, chunks
 
