@@ -52,9 +52,11 @@ class ChunkExtractor:
         soup = BeautifulSoup(html_source, "html.parser")
         
         # Remove noise
-        NOISE_ELEMENTS = ["script", "style", "aside", "footer", "header", "hgroup", "nav", "search"]
-        for tag in soup(NOISE_ELEMENTS):
-            tag.decompose()
+        NOISE_ELEMENTS = ["script", "style", "aside", "footer", "header", "hgroup", "nav", "search", "a", "img"]
+        for element in soup.find_all():
+            if element.name in NOISE_ELEMENTS:
+                element.decompose()
+        
         
         main_extract_result = soup
         # Extract main content
@@ -66,17 +68,11 @@ class ChunkExtractor:
             articles = main_content.find_all("article")
             if articles:
                 main_extract_result = BeautifulSoup("".join(str(article) for article in articles), 'html.parser')
-                print("main->articles")
-            else:
-                print("main")
         else:
             # Extract articles from original html
             articles = soup.find_all("article")
             if articles:
                 main_extract_result = BeautifulSoup("".join(str(article) for article in articles), 'html.parser')
-                print("articles")
-            else:
-                print("original")
         
         text = main_extract_result.get_text(" ", strip=True)  # Use space as a separator, strip whitespaces
         if not text:
@@ -265,7 +261,7 @@ class RAGModel:
         hf_path="sentence-transformers/all-MiniLM-L6-v2"
         bge_large_path="models/bge-base-en-v1.5"
         m3_path="models/bge-m3"
-        parent_chunk_size=700
+        parent_chunk_size=1000
         parent_chunk_overlap=150
         child_chunk_size=200
         child_chunk_overlap=50
@@ -307,9 +303,14 @@ class RAGModel:
                 continue
             hashes.add(hash_value)
             
-            soup = BeautifulSoup(html_content, 'html.parser')
-            text = soup.get_text(separator=" ", strip=True).lower()
+            # preprocess the search results
+            text = self.preprocess_search_result(html_content)
+            
+            # soup = BeautifulSoup(html_content, 'html.parser')
+            # text = soup.get_text(separator=" ", strip=True).lower()
+            
             text = html['page_snippet'].lower() + '\n\n' + text
+            
             inputs = tokenizer.encode(text, max_length=max_length, truncation=True, add_special_tokens=False)
             if len(inputs) == max_length:
                 text = tokenizer.decode(inputs)
@@ -335,7 +336,7 @@ class RAGModel:
         
         return retriever, reranker
     
-    def get_retrieve_res(self, retriever, reranker, query, k=5):
+    def get_retrieve_res(self, retriever, reranker, query, k=10):
         torch.torch.cuda.empty_cache()
         docs = retriever.get_relevant_documents(query)
         print('len docs',len(docs))
@@ -354,7 +355,37 @@ class RAGModel:
             
         return docs 
 
-     
+    def preprocess_search_result(self, html_content):
+        soup = BeautifulSoup(html_content, "html.parser")
+        
+        # Remove noise
+        NOISE_ELEMENTS = ["script", "style", "aside", "footer", "header", "hgroup", "nav", "search", "a", "img"]
+        for element in soup.find_all():
+            if element.name in NOISE_ELEMENTS:
+                element.decompose()
+        
+        main_extract_result = soup
+        # Extract main content
+        main_content = soup.find("main")
+
+        if main_content:
+            main_extract_result = main_content
+            # Extract articles from main content
+            articles = main_content.find_all("article")
+            if articles:
+                main_extract_result = BeautifulSoup("".join(str(article) for article in articles), 'html.parser')
+        else:
+            # Extract articles from original html
+            articles = soup.find_all("article")
+            if articles:
+                main_extract_result = BeautifulSoup("".join(str(article) for article in articles), 'html.parser')
+        
+        text = main_extract_result.get_text(" ", strip=True).lower()  # Use space as a separator, strip whitespaces 
+        if not text:
+            return ""
+        
+        return text
+        
     def batch_generate_answer(self, batch: Dict[str, Any]) -> List[str]:
         """
         Generates answers for a batch of queries using associated (pre-cached) search results and query times.
