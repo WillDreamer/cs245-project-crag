@@ -68,7 +68,6 @@ After retrieving and reranking documents, the model generates responses using a 
 - `vllm`
 - `openai`
 - `beautifulsoup4`
-- `chromadb`
 - `langchain`
 - `langchain_community`
 - `FlagEmbedding`
