@@ -76,15 +76,15 @@ if __name__ == "__main__":
                                  "data/crag_task_1_dev_v4_release.jsonl.bz2", # full data
                                  ])
 
-    parser.add_argument("--model_name", type=str, default="rag_ours",
+    parser.add_argument("--model_name", type=str, default="vanilla_baseline",
                         choices=["vanilla_baseline",
                                  "rag_baseline",
-                                 "rag_ours"
                                  # add your model here
+                                 "rag_ours"
                                  ],
                         )
 
-    parser.add_argument("--llm_name", type=str, default="/home/whx/MolMoE/checkpoints/Llama-3.2-3B-Instruct",
+    parser.add_argument("--llm_name", type=str, default="meta-llama/Llama-3.2-3B-Instruct",
                         choices=["meta-llama/Llama-3.2-3B-Instruct",
                                  "google/gemma-2-2b-it",
                                  # can add more llm models here
@@ -115,8 +115,7 @@ if __name__ == "__main__":
 
     # get output directory
     model_name = args.model_name
-    output_directory = os.path.join("/home/whx/cs245-project-crag", "output", dataset, model_name, _llm_name)
-    os.makedirs(output_directory, exist_ok=True)
+    output_directory = os.path.join("..", "output", dataset, model_name, _llm_name)
     if not os.path.exists(output_directory):
         raise FileNotFoundError(f"Output directory {output_directory} does not exist.")
 
