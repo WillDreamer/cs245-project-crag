@@ -1,7 +1,7 @@
 # ReadMe
 | Haixin Wang, Han Zhang, Nayeli Guzman, Yuwei Xiao
 
-Our RAG model combines multiple essential components to efficiently manage both retrieval and generation tasks. The pipeline includes preprocessing, a parent-child retriever, and a reranker.
+Our RAG model (see `rag_ours.py`) combines multiple essential components to efficiently manage both retrieval and generation tasks. The pipeline includes preprocessing, a parent-child retriever, and a reranker.
 
 ## Pipeline Overview
 
@@ -72,3 +72,11 @@ After retrieving and reranking documents, the model generates responses using a 
 - `langchain`
 - `langchain_community`
 - `FlagEmbedding`
+
+## Running Our Model
+```sh
+export CUDA_VISIBLE_DEVICES=0
+vllm serve meta-llama/Llama-3.2-3B-Instruct --gpu_memory_utilization=0.85 --tensor_parallel_size=1 --dtype="half" --port=8088 --enforce_eager --max_model_len=4096
+python generate.py --dataset_path "data/crag_task_1_dev_v4_release.jsonl.bz2" --split 1 --model_name "rag_ours" --llm_name "meta-llama/Llama-3.2-3B-Instruct" --is_server --vllm_server "http://localhost:8088/v1"
+python evaluate.py --dataset_path "data/crag_task_1_dev_v4_release.jsonl.bz2" --model_name "rag_ours" --llm_name "meta-llama/Llama-3.2-3B-Instruct" --is_server --vllm_server "http://localhost:8088/v1" --max_retries 10
+```
