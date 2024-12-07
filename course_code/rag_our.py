@@ -6,15 +6,13 @@ import numpy as np
 import ray
 import torch
 import vllm
-from blingfire import text_to_sentences_and_offsets
 from bs4 import BeautifulSoup
 from sentence_transformers import SentenceTransformer
 
 from openai import OpenAI
 
 from tqdm import tqdm
-from time import time
-from langchain.text_splitter import CharacterTextSplitter, RecursiveCharacterTextSplitter
+from langchain.text_splitter import CharacterTextSplitter
 from langchain.schema import Document
 from langchain_community.embeddings import HuggingFaceEmbeddings
 from langchain_community.vectorstores import Chroma
@@ -22,14 +20,10 @@ from transformers import AutoTokenizer
 from langchain_core.documents import Document
 from langchain.storage import InMemoryStore
 from langchain.retrievers import ParentDocumentRetriever
-from FlagEmbedding import BGEM3FlagModel,FlagReranker
+from FlagEmbedding import FlagReranker
 
 #### CONFIG PARAMETERS ---
 
-# Define the number of context sentences to consider for generating an answer.
-NUM_CONTEXT_SENTENCES = 20
-# Set the maximum length for each context sentence (in characters).
-MAX_CONTEXT_SENTENCE_LENGTH = 1000
 # Set the maximum context references length (in characters).
 MAX_CONTEXT_REFERENCES_LENGTH = 4000
 
