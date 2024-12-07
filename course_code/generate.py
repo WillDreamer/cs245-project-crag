@@ -71,11 +71,10 @@ def generate_predictions(dataset_path, model, split):
     for batch in tqdm(load_data_in_batches(dataset_path, batch_size, split), desc="Generating predictions"):
         batch_ground_truths = batch.pop("answer")  # Remove answers from batch and store them
         batch_predictions = model.batch_generate_answer(batch)
-
         queries.extend(batch["query"])
         ground_truths.extend(batch_ground_truths)
         predictions.extend(batch_predictions)
-
+        
     return queries, ground_truths, predictions
 
 
@@ -90,7 +89,7 @@ if __name__ == "__main__":
                         help="The split of the dataset to use. This is only relevant for the full data: "
                              "0 for public validation set, 1 for public test set")
 
-    parser.add_argument("--model_name", type=str, default="rag_ours",
+    parser.add_argument("--model_name", type=str, default="vanilla_baseline",
                         choices=["vanilla_baseline",
                                  "rag_baseline",
                                  "rag_ours"
@@ -98,10 +97,10 @@ if __name__ == "__main__":
                                  ],
                         )
 
-    parser.add_argument("--llm_name", type=str, default="/home/whx/MolMoE/checkpoints/Llama-3.2-3B-Instruct",
+    parser.add_argument("--llm_name", type=str, default="meta-llama/Llama-3.2-3B-Instruct",
                         choices=["meta-llama/Llama-3.2-3B-Instruct",
+                                 "meta-llama/Llama-3.2-1B-Instruct",
                                  "google/gemma-2-2b-it",
-                                 "/home/whx/MolMoE/checkpoints/Llama-3.2-3B-Instruct"
                                  # can add more llm models here
                                  ])
     parser.add_argument("--is_server", action="store_true", default=False,
@@ -120,7 +119,7 @@ if __name__ == "__main__":
         if split == -1:
             raise ValueError("Please provide a valid split value for the full data: "
                              "0 for public validation set, 1 for public test set.")
-    dataset_path = os.path.join("/home/whx/cs245-project-crag/", dataset_path)
+    dataset_path = os.path.join("..", dataset_path)
 
     llm_name = args.llm_name
     _llm_name = llm_name.split("/")[-1]
@@ -139,7 +138,7 @@ if __name__ == "__main__":
         raise ValueError("Model name not recognized.")
 
     # make output directory
-    output_directory = os.path.join("/home/whx/cs245-project-crag", "output", dataset, model_name, _llm_name)
+    output_directory = os.path.join("..", "output", dataset, model_name, _llm_name)
     os.makedirs(output_directory, exist_ok=True)
 
     # Generate predictions
