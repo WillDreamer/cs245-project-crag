@@ -45,133 +45,6 @@ SENTENTENCE_TRANSFORMER_BATCH_SIZE = 32 # TUNE THIS VARIABLE depending on the si
 
 #### CONFIG PARAMETERS END---
 
-class ChunkExtractor:
-    @ray.remote
-    def _my_extract_chunks(self, interaction_id, html_source):
-         # Parse the HTML content using BeautifulSoup
-        soup = BeautifulSoup(html_source, "html.parser")
-        
-        # Remove noise
-        NOISE_ELEMENTS = ["script", "style", "aside", "footer", "header", "hgroup", "nav", "search", "a", "img"]
-        for element in soup.find_all():
-            if element.name in NOISE_ELEMENTS:
-                element.decompose()
-        
-        
-        main_extract_result = soup
-        # Extract main content
-        main_content = soup.find("main")
-
-        if main_content:
-            main_extract_result = main_content
-            # Extract articles from main content
-            articles = main_content.find_all("article")
-            if articles:
-                main_extract_result = BeautifulSoup("".join(str(article) for article in articles), 'html.parser')
-        else:
-            # Extract articles from original html
-            articles = soup.find_all("article")
-            if articles:
-                main_extract_result = BeautifulSoup("".join(str(article) for article in articles), 'html.parser')
-        
-        text = main_extract_result.get_text(" ", strip=True)  # Use space as a separator, strip whitespaces
-        if not text:
-            # Return a list with empty string when no text is extracted
-            return interaction_id, [""]
-        text_splitter = CharacterTextSplitter(chunk_size=500, chunk_overlap=50)
-        chunks = text_splitter.split_text(text)
-    
-        # Extract meaningful chunks
-        # max_tokens = 300
-        # chunks = []
-        # current_chunk = {"heading": None, "content": ""}
-        # current_tokens = 0
-
-        # for element in main_extract_result.find_all():
-        #     if element.name in ['h1', 'h2', 'h3']:
-        #         # Start a new chunk
-        #         if current_chunk['content']:
-        #             chunks.append(current_chunk)
-        #         current_chunk = {"heading": element.get_text(strip=True), "content": ""}
-        #         current_tokens = 0
-        #     elif element.name in ['p', 'li', 'span', 'div']:
-        #         # Append content to the current chunk
-        #         text = element.get_text(strip=True)
-        #         tokens = len(text.split())
-        #         if current_tokens + tokens > max_tokens:
-        #             # Save the current chunk and start a new one
-        #             chunks.append(current_chunk)
-        #             current_chunk = {"heading": current_chunk['heading'], "content": ""}
-        #             current_tokens = 0
-        #         current_chunk['content'] += text + " "
-        #         current_tokens += tokens
-        
-        # # Add the last chunk
-        # if current_chunk['content']:
-        #     chunks.append(current_chunk)
-        
-        return interaction_id, chunks
-
-    def extract_chunks(self, batch_interaction_ids, batch_search_results):
-        """
-        Extracts chunks from given batch search results using parallel processing with Ray.
-
-        Parameters:
-            batch_interaction_ids (List[str]): List of interaction IDs.
-            batch_search_results (List[List[Dict]]): List of search results batches, each containing HTML text.
-
-        Returns:
-            Tuple[np.ndarray, np.ndarray]: A tuple containing an array of chunks and an array of corresponding interaction IDs.
-        """
-        # Setup parallel chunk extraction using ray remote
-        ray_response_refs = [
-            self._my_extract_chunks.remote(
-                self,
-                interaction_id=batch_interaction_ids[idx],
-                html_source=html_text["page_result"]
-            )
-            for idx, search_results in enumerate(batch_search_results)
-            for html_text in search_results
-        ]
-
-        # Wait until all sentence extractions are complete
-        # and collect chunks for every interaction_id separately
-        chunk_dictionary = defaultdict(list)
-
-        for response_ref in ray_response_refs:
-            interaction_id, _chunks = ray.get(response_ref)  # Blocking call until parallel execution is complete
-            chunk_dictionary[interaction_id].extend(_chunks)
-
-        # Flatten chunks and keep a map of corresponding interaction_ids
-        chunks, chunk_interaction_ids = self._flatten_chunks(chunk_dictionary)
-
-        return chunks, chunk_interaction_ids
-
-    def _flatten_chunks(self, chunk_dictionary):
-        """
-        Flattens the chunk dictionary into separate lists for chunks and their corresponding interaction IDs.
-
-        Parameters:
-            chunk_dictionary (defaultdict): Dictionary with interaction IDs as keys and lists of chunks as values.
-
-        Returns:
-            Tuple[np.ndarray, np.ndarray]: A tuple containing an array of chunks and an array of corresponding interaction IDs.
-        """
-        chunks = []
-        chunk_interaction_ids = []
-
-        for interaction_id, _chunks in chunk_dictionary.items():
-            # De-duplicate chunks within the scope of an interaction ID
-            unique_chunks = list(set(_chunks))
-            chunks.extend(unique_chunks)
-            chunk_interaction_ids.extend([interaction_id] * len(unique_chunks))
-
-        # Convert to numpy arrays for convenient slicing/masking operations later
-        chunks = np.array(chunks)
-        chunk_interaction_ids = np.array(chunk_interaction_ids)
-
-        return chunks, chunk_interaction_ids
-
 class RAGModel:
     """
     An example RAGModel for the KDDCup 2024 Meta CRAG Challenge
@@ -179,7 +52,6 @@ class RAGModel:
     """
     def __init__(self, llm_name="meta-llama/Llama-3.2-3B-Instruct", is_server=False, vllm_server=None):
         self.initialize_models(llm_name, is_server, vllm_server)
-        self.chunk_extractor = ChunkExtractor()
 
     def initialize_models(self, llm_name, is_server, vllm_server):
         self.llm_name = llm_name
@@ -215,32 +87,6 @@ class RAGModel:
             ),
         )
 
-    def calculate_embeddings(self, sentences):
-        """
-        Compute normalized embeddings for a list of sentences using a sentence encoding model.
-
-        This function leverages multiprocessing to encode the sentences, which can enhance the
-        processing speed on multi-core machines.
-
-        Args:
-            sentences (List[str]): A list of sentences for which embeddings are to be computed.
-
-        Returns:
-            np.ndarray: An array of normalized embeddings for the given sentences.
-
-        """
-        embeddings = self.sentence_model.encode(
-            sentences=sentences,
-            normalize_embeddings=True,
-            batch_size=SENTENTENCE_TRANSFORMER_BATCH_SIZE,
-        )
-        # Note: There is an opportunity to parallelize the embedding generation across 4 GPUs
-        #       but sentence_model.encode_multi_process seems to interefere with Ray
-        #       on the evaluation servers. 
-        #       todo: this can also be done in a Ray native approach.
-        #       
-        return embeddings
-
     def get_batch_size(self) -> int:
         """
         Determines the batch size that is used by the evaluator when calling the `batch_generate_answer` function.
@@ -260,7 +106,6 @@ class RAGModel:
         # PARAMS
         hf_path="sentence-transformers/all-MiniLM-L6-v2"
         bge_large_path="models/bge-base-en-v1.5"
-        m3_path="models/bge-m3"
         parent_chunk_size=1000
         parent_chunk_overlap=150
         child_chunk_size=200
@@ -269,9 +114,7 @@ class RAGModel:
         recall_k = 50
         batch_size = 32
         top_k_search = 5
-        separators=['.', "\n", " ", ""]
         token_path="meta-llama/Llama-3.2-3B-Instruct"
-        # stopwords_list = 'models/processed_data/stopwords_list.npy'
         rerank_path ='BAAI/bge-reranker-v2-m3'
 
         hf_embeddings = HuggingFaceEmbeddings(model_name=hf_path,
@@ -291,7 +134,6 @@ class RAGModel:
             chunk_overlap=child_chunk_overlap,
             separator=' ',
         )
-        # stopwords_list = np.load(stopwords_list).tolist()
         
         # init retriever
         docs = []
@@ -339,7 +181,7 @@ class RAGModel:
     def get_retrieve_res(self, retriever, reranker, query, k=10):
         torch.torch.cuda.empty_cache()
         docs = retriever.get_relevant_documents(query)
-        print('len docs',len(docs))
+        print('# of docs',len(docs))
         if docs ==[]:
             return [""]
         if len(docs) <= k:
@@ -415,41 +257,11 @@ class RAGModel:
         batch_search_results = batch["search_results"]
         query_times = batch["query_time"]
 
-        # Chunk all search results using ChunkExtractor
-        # chunks, chunk_interaction_ids = self.chunk_extractor.extract_chunks(
-        #     batch_interaction_ids, batch_search_results
-        # )
-
-        # # Calculate all chunk embeddings
-        # chunk_embeddings = self.calculate_embeddings(chunks)
-
-        # # Calculate embeddings for queries
-        # query_embeddings = self.calculate_embeddings(queries)
-        
-        # ==========================
-        # ==========================
-
         # Retrieve top matches for the whole batch
         batch_retrieval_results = []
         for _idx, interaction_id in enumerate(batch_interaction_ids):
             query = queries[_idx]
             query_time = query_times[_idx]
-            # query_embedding = query_embeddings[_idx]
-
-            # # Identify chunks that belong to this interaction_id
-            # relevant_chunks_mask = chunk_interaction_ids == interaction_id
-
-            # # Filter out the said chunks and corresponding embeddings
-            # relevant_chunks = chunks[relevant_chunks_mask]
-            # relevant_chunks_embeddings = chunk_embeddings[relevant_chunks_mask]
-
-            # # Calculate cosine similarity between query and chunk embeddings,
-            # cosine_scores = (relevant_chunks_embeddings * query_embedding).sum(1)
-
-            # # and retrieve top-N results.
-            # retrieval_results = relevant_chunks[
-            #     (-cosine_scores).argsort()[:NUM_CONTEXT_SENTENCES]
-            # ]
             
             # ==============================
             search_results = batch_search_results[_idx]
